@@ -1,0 +1,21 @@
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/.terraform.lock.hcl
+terraform/terraform.tfvars
+
+# Components (downloaded at build time)
+components/
+
+# Build output
+build/output/
+build/staging/
+
+# PowerShell
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+

@@ -1,0 +1,34 @@
+
+#SPDX-License-Identifier: MIT-0
+---
+# Deploy Windows Installer Package
+# Calls the deploy-installer role against Windows targets
+# Will be called by azure-pipelines.yml Stage 3
+
+- name: Deploy and verify DevOps Toolkit on Windows
+  hosts: windows_targets
+  gather_facts: true
+  # gather_facts: true = collect Windows system info (hostname, date, etc.)
+  # Needed for the installation report
+
+  vars:
+    # ── WinRM Connection Settings ──
+    ansible_connection: winrm
+    # Use WinRM (not SSH) to connect to Windows
+
+    ansible_winrm_transport: basic
+    # basic = username + password authentication
+
+    ansible_winrm_server_cert_validation: ignore
+    # Don't verify SSL cert (test environment only)
+
+    ansible_port: 5985
+    # WinRM HTTP port
+
+    # ── Override role variables if needed ──
+    # package_path is passed from pipeline: -e "package_path=/path/to/zip"
+
+  roles:
+    - deploy-installer
+    # Calls ansible/roles/deploy-installer/tasks/main.yml
+

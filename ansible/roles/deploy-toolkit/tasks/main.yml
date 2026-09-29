@@ -1,0 +1,160 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for deploy-installer
+# Copy .zip to Windows VM, extract, install all tools, verify
+# It will be executed against Windows VM via WinRM
+
+# ── Step 1: Create install directory ──
+- name: Create install directory
+  win_file:
+    path: "{{ install_dir }}"
+    state: directory
+  # win_file = Windows version of Ansible's 'file' module
+  # Creates C:\DevOpsToolkit on the Windows VM
+
+# ── Step 2: Copy .zip to Windows VM ──
+- name: Copy installer package to Windows VM
+  win_copy:
+    src: "{{ package_path }}"
+    dest: "{{ install_dir }}\\{{ package_name }}.zip"
+  # win_copy = copies file FROM Linux agent TO Windows VM
+  # package_path is passed from the pipeline as extra variable (-e)
+
+# ── Step 3: Extract .zip ──
+- name: Extract installer package
+  win_unzip:
+    src: "{{ install_dir }}\\{{ package_name }}.zip"
+    dest: "{{ install_dir }}"
+  # win_unzip = extracts zip on Windows
+  # After this: C:\DevOpsToolkit\components\*.exe
+
+# ── Step 4: Install Notepad++ ──
+- name: Install Notepad++
+  win_package:
+    path: "{{ install_dir }}\\{{ package_name }}\\components\\npp-installer.exe"
+    arguments: /S
+    state: present
+  # win_package = installs .exe/.msi packages
+  # /S = Notepad++ silent install flag
+
+# ── Step 5: Install Git ──
+- name: Install Git
+  win_package:
+    path: "{{ install_dir }}\\{{ package_name }}\\components\\git-installer.exe"
+    arguments: /VERYSILENT /NORESTART
+    state: present
+  # /VERYSILENT = Git's flag for completely silent install
+  # /NORESTART = don't restart the computer
+
+# ── Step 6: Install Python ──
+- name: Install Python
+  win_package:
+    path: "{{ install_dir }}\\{{ package_name }}\\components\\python-installer.exe"
+    arguments: /quiet InstallAllUsers=1 PrependPath=1
+    state: present
+  # /quiet = silent install
+  # InstallAllUsers=1 = install for all users
+  # PrependPath=1 = add Python to system PATH
+
+# ── Step 7: Install AWS CLI ──
+- name: Install AWS CLI
+  win_package:
+    path: "{{ install_dir }}\\{{ package_name }}\\components\\awscli-installer.msi"
+    arguments: /quiet /norestart
+    state: present
+  # .msi files are handled automatically by win_package
+  # No need for msiexec — Ansible handles it
+
+# ── Step 8: Refresh PATH ──
+- name: Refresh environment PATH
+  win_shell: |
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+  # After installing tools, PATH needs refresh
+  # Otherwise git --version etc. won't work
+
+# ── Step 9: Verify Notepad++ ──
+- name: Verify Notepad++ installed
+  win_stat:
+    path: 'C:\Program Files\Notepad++\notepad++.exe'
+  register: npp_check
+  # win_stat = check if file exists on Windows
+
+- name: Assert Notepad++ exists
+  assert:
+    that: npp_check.stat.exists
+    fail_msg: "Notepad++ NOT installed!"
+    success_msg: "Notepad++ installed"
+
+# ── Step 10: Verify Git ──
+- name: Verify Git installed
+  win_shell: git --version
+  register: git_check
+  ignore_errors: true
+
+- name: Show Git version
+  debug:
+    msg: "{{ git_check.stdout | trim }}"
+  when: git_check.rc == 0
+
+- name: Fail if Git not found
+  fail:
+    msg: "Git NOT installed!"
+  when: git_check.rc != 0
+
+# ── Step 11: Verify Python ──
+- name: Verify Python installed
+  win_shell: python --version
+  register: python_check
+  ignore_errors: true
+
+- name: Show Python version
+  debug:
+    msg: "{{ python_check.stdout | trim }}"
+  when: python_check.rc == 0
+
+- name: Fail if Python not found
+  fail:
+    msg: "Python NOT installed!"
+  when: python_check.rc != 0
+
+# ── Step 12: Verify AWS CLI ──
+- name: Verify AWS CLI installed
+  win_shell: aws --version
+  register: aws_check
+  ignore_errors: true
+
+- name: Show AWS CLI version
+  debug:
+    msg: "{{ aws_check.stdout | trim }}"
+  when: aws_check.rc == 0
+
+- name: Fail if AWS CLI not found
+  fail:
+    msg: "AWS CLI NOT installed!"
+  when: aws_check.rc != 0
+
+# ── Step 13: Generate verification report ──
+- name: Generate installation report
+  win_copy:
+    content: |
+      ============================================
+        DevOps Toolkit - Installation Report
+        Date: {{ ansible_date_time.iso8601 }}
+        Host: {{ ansible_hostname }}
+      ============================================
+      Notepad++: {{ 'INSTALLED' if npp_check.stat.exists else 'MISSING' }}
+      Git:       {{ git_check.stdout | default('MISSING') | trim }}
+      Python:    {{ python_check.stdout | default('MISSING') | trim }}
+      AWS CLI:   {{ aws_check.stdout | default('MISSING') | trim }}
+      ============================================
+    dest: "{{ install_dir }}\\install-report.txt"
+  # Creates a text report on the Windows VM
+
+- name: Display installation report
+  win_shell: Get-Content "{{ install_dir }}\\install-report.txt"
+  register: report
+
+- name: Show report
+  debug:
+    msg: "{{ report.stdout }}"
+

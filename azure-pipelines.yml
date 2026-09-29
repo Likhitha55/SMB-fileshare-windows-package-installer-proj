@@ -1,0 +1,201 @@
+trigger:
+  branches:
+    include:
+      - master
+
+pool:
+  name: 'aws-ec2-pool'
+
+variables:
+  - group: 'aws-credentials'
+
+stages:
+
+
+# STAGE 1: Download Components + Build Package
+
+- stage: BuildPackage
+  displayName: 'Stage 1 - Build Installer Package'
+  jobs:
+  - job: Build
+    displayName: 'Download & Package'
+    steps:
+
+    - script: |
+        echo "=== Installing PowerShell Core ==="
+        if command -v pwsh &> /dev/null; then
+          echo "pwsh already installed: $(pwsh --version)"
+        else
+          curl -L -o /tmp/powershell.tar.gz \
+            https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-linux-x64.tar.gz
+          sudo mkdir -p /opt/microsoft/powershell/7
+          sudo tar zxf /tmp/powershell.tar.gz -C /opt/microsoft/powershell/7
+          sudo chmod +x /opt/microsoft/powershell/7/pwsh
+          sudo ln -sf /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh
+          echo "Installed: $(pwsh --version)"
+        fi
+      displayName: 'Install PowerShell Core'
+
+    - script: |
+        sudo dnf install -y zip unzip
+      displayName: 'Install zip utility'
+
+    - script: |
+        pwsh -File scripts/download-components.ps1 -OutputDir ./components
+      displayName: 'Download All Components'
+
+    - script: |
+        pwsh -File build/package.ps1 \
+          -ComponentDir ./components \
+          -ScriptDir ./scripts \
+          -OutputDir ./build/output
+      displayName: 'Build Installer Package'
+
+    - script: |
+        echo "=== Package Contents ==="
+        ls -lah build/output/
+        echo ""
+        echo "=== Checksum ==="
+        cat build/output/DevOpsToolkit-Setup.zip.sha256
+      displayName: 'Verify Package'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'build/output'
+        ArtifactName: 'installer-package'
+        publishLocation: 'Container'
+      displayName: 'Publish Installer Artifact'
+
+
+# STAGE 2: Provision Windows VM with Terraform
+
+- stage: ProvisionVM
+  displayName: 'Stage 2 - Create Windows VM'
+  dependsOn: BuildPackage
+  jobs:
+  - job: Terraform
+    displayName: 'Terraform Apply'
+    steps:
+
+    - script: |
+        cd terraform
+        terraform init
+        terraform apply -auto-approve
+        echo ""
+        echo "=== Outputs ==="
+        terraform output -json
+      displayName: 'Terraform Apply'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+        WINDOWS_PASSWORD: $(WINDOWS_PASSWORD)
+
+    - script: |
+        WINDOWS_IP=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=devops-toolkit-windows-vm" \
+                    "Name=instance-state-name,Values=running" \
+          --query "Reservations[].Instances[].PublicIpAddress" \
+          --output text \
+          --region $(AWS_DEFAULT_REGION))
+        
+        echo "Windows VM IP: $WINDOWS_IP"
+        echo "##vso[task.setvariable variable=WINDOWS_IP;isOutput=true]$WINDOWS_IP"
+      name: getIP
+      displayName: 'Get Windows VM IP'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
+
+# STAGE 3: Deploy & Install via Ansible
+
+- stage: DeployAndVerify
+  displayName: 'Stage 3 - Deploy & Verify'
+  dependsOn: ProvisionVM
+  variables:
+    WINDOWS_IP: $[ stageDependencies.ProvisionVM.Terraform.outputs['getIP.WINDOWS_IP'] ]
+  jobs:
+  - job: Deploy
+    displayName: 'Deploy Installer'
+    steps:
+
+    - task: DownloadBuildArtifacts@1
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'installer-package'
+        downloadPath: '$(System.ArtifactsDirectory)'
+      displayName: 'Download Installer Artifact'
+
+    - script: |
+        sudo dnf install -y python3-pip
+        pip3 install pywinrm ansible
+        ansible-galaxy collection install ansible.windows community.windows
+      displayName: 'Install Ansible + WinRM'
+
+    - script: |
+        echo "=== Creating Inventory ==="
+        cat > /tmp/windows-inventory.ini << EOF
+        [windows_targets]
+        $(WINDOWS_IP)
+
+        [windows_targets:vars]
+        ansible_user=Administrator
+        ansible_password=[PASSWORD]!
+        ansible_connection=winrm
+        ansible_winrm_transport=basic
+        ansible_winrm_server_cert_validation=ignore
+        ansible_port=5985
+        EOF
+        
+        echo "=== Inventory ==="
+        cat /tmp/windows-inventory.ini
+      displayName: 'Create Windows Inventory'
+
+    - script: |
+        echo "=== Waiting for WinRM (5 min) ==="
+        for i in $(seq 1 30); do
+          if curl -s -o /dev/null -w "%{http_code}" \
+            http://$(WINDOWS_IP):5985/wsman 2>/dev/null | grep -q "405"; then
+            echo "WinRM is ready!"
+            break
+          fi
+          echo "Attempt $i/30 - waiting 10s..."
+          sleep 10
+        done
+      displayName: 'Wait for WinRM'
+
+    - script: |
+        ANSIBLE_CONFIG=ansible/ansible.cfg \
+        ansible-playbook \
+          -i /tmp/windows-inventory.ini \
+          ansible/playbooks/deploy-installer.yml \
+          -e "package_path=$(System.ArtifactsDirectory)/installer-package/DevOpsToolkit-Setup.zip" \
+          -vv
+      displayName: 'Deploy & Install via Ansible'
+
+
+# STAGE 4: Cleanup (Optional — runs always)
+
+- stage: Cleanup
+  displayName: 'Stage 4 - Destroy Infrastructure'
+  dependsOn: DeployAndVerify
+  condition: always()
+  jobs:
+  - job: Destroy
+    displayName: 'Terraform Destroy'
+    steps:
+
+    - script: |
+        cd terraform
+        terraform init
+        terraform destroy -auto-approve
+        echo "Infrastructure destroyed!"
+      displayName: 'Terraform Destroy'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
+
