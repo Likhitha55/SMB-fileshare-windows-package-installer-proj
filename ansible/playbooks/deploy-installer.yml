@@ -7,7 +7,7 @@
 
 - name: Deploy and verify DevOps Toolkit on Windows
   hosts: windows_targets
-  gather_facts: true
+  gather_facts: false
   # gather_facts: true = collect Windows system info (hostname, date, etc.)
   # Needed for the installation report
 
@@ -24,11 +24,14 @@
 
     ansible_port: 5985
     # WinRM HTTP port
+    install_dir: C:\DevOpsToolkit
+    package_name: devops-toolkit-package
+    s3_bucket: devops-toolkit-packages
 
     # ── Override role variables if needed ──
     # package_path is passed from pipeline: -e "package_path=/path/to/zip"
 
   roles:
-    - deploy-installer
+    - deploy-toolkit
     # Calls ansible/roles/deploy-installer/tasks/main.yml
 

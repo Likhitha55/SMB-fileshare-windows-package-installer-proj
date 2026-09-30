@@ -34,6 +34,7 @@
     path: "{{ install_dir }}\\{{ package_name }}\\components\\npp-installer.exe"
     arguments: /S
     state: present
+  timeout: 300
   # win_package = installs .exe/.msi packages
   # /S = Notepad++ silent install flag
 
@@ -43,6 +44,7 @@
     path: "{{ install_dir }}\\{{ package_name }}\\components\\git-installer.exe"
     arguments: /VERYSILENT /NORESTART
     state: present
+  timeout: 300
   # /VERYSILENT = Git's flag for completely silent install
   # /NORESTART = don't restart the computer
 
@@ -52,6 +54,7 @@
     path: "{{ install_dir }}\\{{ package_name }}\\components\\python-installer.exe"
     arguments: /quiet InstallAllUsers=1 PrependPath=1
     state: present
+  timeout: 300
   # /quiet = silent install
   # InstallAllUsers=1 = install for all users
   # PrependPath=1 = add Python to system PATH
@@ -62,6 +65,7 @@
     path: "{{ install_dir }}\\{{ package_name }}\\components\\awscli-installer.msi"
     arguments: /quiet /norestart
     state: present
+  timeout: 300
   # .msi files are handled automatically by win_package
   # No need for msiexec — Ansible handles it
 
@@ -71,6 +75,16 @@
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
   # After installing tools, PATH needs refresh
   # Otherwise git --version etc. won't work
+
+- name: Check what files exist
+  win_shell: |
+    Write-Host "=== All files in install dir ==="
+    Get-ChildItem "C:\DevOpsToolkit" -Recurse | ForEach-Object { Write-Host $_.FullName }
+  register: file_list
+
+- name: Show files
+  debug:
+    msg: "{{ file_list.stdout_lines }}"
 
 # ── Step 9: Verify Notepad++ ──
 - name: Verify Notepad++ installed
@@ -134,13 +148,22 @@
   when: aws_check.rc != 0
 
 # ── Step 13: Generate verification report ──
+
+- name: Get current date
+  win_shell: Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+  register: current_date
+
+- name: Get hostname
+  win_shell: hostname
+  register: win_hostname
+
 - name: Generate installation report
   win_copy:
     content: |
       ============================================
         DevOps Toolkit - Installation Report
-        Date: {{ ansible_date_time.iso8601 }}
-        Host: {{ ansible_hostname }}
+        Date: {{ current_date.stdout | trim }}
+        Host: {{ win_hostname.stdout | trim }}
       ============================================
       Notepad++: {{ 'INSTALLED' if npp_check.stat.exists else 'MISSING' }}
       Git:       {{ git_check.stdout | default('MISSING') | trim }}
@@ -148,7 +171,23 @@
       AWS CLI:   {{ aws_check.stdout | default('MISSING') | trim }}
       ============================================
     dest: "{{ install_dir }}\\install-report.txt"
-  # Creates a text report on the Windows VM
+
+
+# - name: Generate installation report
+#   win_copy:
+#     content: |
+#       ============================================
+#         DevOps Toolkit - Installation Report
+#         Date: {{ ansible_date_time.iso8601 }}
+#         Host: {{ ansible_hostname }}
+#       ============================================
+#       Notepad++: {{ 'INSTALLED' if npp_check.stat.exists else 'MISSING' }}
+#       Git:       {{ git_check.stdout | default('MISSING') | trim }}
+#       Python:    {{ python_check.stdout | default('MISSING') | trim }}
+#       AWS CLI:   {{ aws_check.stdout | default('MISSING') | trim }}
+#       ============================================
+#     dest: "{{ install_dir }}\\install-report.txt"
+#   # Creates a text report on the Windows VM
 
 - name: Display installation report
   win_shell: Get-Content "{{ install_dir }}\\install-report.txt"
