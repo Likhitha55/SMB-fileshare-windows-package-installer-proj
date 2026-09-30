@@ -80,7 +80,11 @@ stages:
     - script: |
         cd terraform
         terraform init
-        terraform apply -auto-approve
+        terraform apply -auto-approve \
+          -var="subnet_id=$(SUBNET_ID)" \
+          -var="vpc_id=$(VPC_ID)" \
+          -var="windows_password=$(WINDOWS_PASSWORD)" \
+          -var="key_name=$(KEY_NAME)"
         echo ""
         echo "=== Outputs ==="
         terraform output -json
@@ -89,9 +93,6 @@ stages:
         AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
         AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
         AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
-        WINDOWS_PASSWORD: $(WINDOWS_PASSWORD)
-        SUBNET_ID: $(SUBNET_ID)
-        VPC_ID: $(VPC_ID)
 
     - script: |
         WINDOWS_IP=$(aws ec2 describe-instances \
