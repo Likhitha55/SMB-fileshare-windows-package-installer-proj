@@ -7,7 +7,7 @@ pool:
   name: 'aws-ec2-pool'
 
 variables:
-  - group: 'aws-credentials'
+  - group: 'aws-devops-secrets'
 
 stages:
 
