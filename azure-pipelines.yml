@@ -66,6 +66,43 @@ stages:
         publishLocation: 'Container'
       displayName: 'Publish Installer Artifact'
 
+    # ===========================================================================
+    # ***************************************************************************
+    # ===========================================================================
+
+    # Upload to S3 File Share ──
+    - script: |
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        BUILD_ID=$(Build.BuildId)
+        BUCKET="devops-toolkit-packages"
+        PACKAGE="$(Build.ArtifactStagingDirectory)/DevOpsToolkit-Setup.zip"
+
+        echo "============================================"
+        echo "  Uploading to S3 File Share"
+        echo "============================================"
+
+        # Upload to latest/ (always overwritten)
+        aws s3 cp "$PACKAGE" "s3://$BUCKET/packages/latest/DevOpsToolkit-Setup.zip"
+        echo "Uploaded to s3://$BUCKET/packages/latest/"
+
+        # Upload to archive/ (timestamped — never overwritten)
+        aws s3 cp "$PACKAGE" "s3://$BUCKET/packages/archive/DevOpsToolkit-Setup-$TIMESTAMP-build$BUILD_ID.zip"
+        echo "Archived as DevOpsToolkit-Setup-$TIMESTAMP-build$BUILD_ID.zip"
+
+        # Show archive contents
+        echo ""
+        echo "=== S3 Archive Contents ==="
+        aws s3 ls "s3://$BUCKET/packages/archive/" --human-readable
+
+        echo ""
+        echo "=== Download Commands ==="
+        echo "Latest:  aws s3 cp s3://$BUCKET/packages/latest/DevOpsToolkit-Setup.zip ."
+        echo "Archive: aws s3 cp s3://$BUCKET/packages/archive/DevOpsToolkit-Setup-$TIMESTAMP-build$BUILD_ID.zip ."
+      displayName: 'Upload to S3 File Share'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
 # STAGE 2: Provision Windows VM with Terraform
 
