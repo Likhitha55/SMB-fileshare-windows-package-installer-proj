@@ -95,6 +95,7 @@ stages:
         AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
     - script: |
+          cd terraform
           WIN_IP=$(terraform output -raw public_ip 2>/dev/null)
 
        
@@ -123,7 +124,7 @@ stages:
   displayName: 'Stage 3 - Deploy & Verify'
   dependsOn: ProvisionVM
   variables:
-    WINDOWS_IP: $[ stageDependencies.ProvisionVM.Terraform.outputs['getIP.WINDOWS_IP'] ]
+    WINDOWS_IP: $[ stageDependencies.ProvisionVM.Terraform.outputs['getIP.WIN_VM_IP'] ]
   jobs:
   - job: Deploy
     displayName: 'Deploy Installer'
