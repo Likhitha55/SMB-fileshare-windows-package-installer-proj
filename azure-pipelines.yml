@@ -75,11 +75,21 @@ stages:
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
         BUILD_ID=$(Build.BuildId)
         BUCKET="devops-toolkit-packages"
-        PACKAGE="$(Build.ArtifactStagingDirectory)/DevOpsToolkit-Setup.zip"
+        PACKAGE="$(Build.SourcesDirectory)/build/output/DevOpsToolkit-Setup.zip"
 
         echo "============================================"
         echo "  Uploading to S3 File Share"
         echo "============================================"
+
+                # Verify file exists
+        if [ ! -f "$PACKAGE" ]; then
+          echo "Package not found at: $PACKAGE"
+          echo "=== Searching for it ==="
+          find $(Build.SourcesDirectory) -name "DevOpsToolkit-Setup.zip" 2>/dev/null
+          exit 1
+        fi
+
+        ls -lh "$PACKAGE"
 
         # Upload to latest/ (always overwritten)
         aws s3 cp "$PACKAGE" "s3://$BUCKET/packages/latest/DevOpsToolkit-Setup.zip"
@@ -92,6 +102,10 @@ stages:
         # Show archive contents
         echo ""
         echo "=== S3 Archive Contents ==="
+        aws s3 ls "s3://$BUCKET/packages/archive/" --human-readable
+
+        # Verify upload
+        aws s3 ls "s3://$BUCKET/packages/latest/" --human-readable
         aws s3 ls "s3://$BUCKET/packages/archive/" --human-readable
 
         echo ""
