@@ -199,7 +199,11 @@ stages:
     - script: |
         cd terraform
         terraform init
-        terraform destroy -auto-approve
+        terraform destroy -auto-approve \
+          -var="subnet_id=$(SUBNET_ID)" \
+          -var="vpc_id=$(VPC_ID)" \
+          -var="windows_password=$(WINDOWS_PASSWORD)" \
+          -var="key_name=$(KEY_NAME)"
         echo "Infrastructure destroyed!"
       displayName: 'Terraform Destroy'
       env:
