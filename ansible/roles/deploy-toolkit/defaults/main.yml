@@ -4,4 +4,5 @@
 install_dir: C:\DevOpsToolkit\DevOpsToolkit
 package_name: devops-toolkit-package
 package_source: "{{ playbook_dir }}/../../package/devops-toolkit-package.zip"
+components_dir: "{{ install_dir }}\\{{ package_name }}\\components"
 s3_bucket: devops-toolkit-packages
