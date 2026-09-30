@@ -167,13 +167,26 @@ stages:
     displayName: 'Deploy Installer'
     steps:
 
-    - task: DownloadBuildArtifacts@1
-      inputs:
-        buildType: 'current'
-        downloadType: 'single'
-        artifactName: 'installer-package'
-        downloadPath: '$(System.ArtifactsDirectory)'
-      displayName: 'Download Installer Artifact'
+    - script: |
+        echo "============================================"
+        echo "  Downloading from S3 File Share"
+        echo "============================================"
+
+        BUCKET="devops-toolkit-packages"
+        DOWNLOAD_DIR="$(System.ArtifactsDirectory)/installer-package"
+        mkdir -p "$DOWNLOAD_DIR"
+
+        # Download latest package from S3
+        aws s3 cp "s3://$BUCKET/packages/latest/DevOpsToolkit-Setup.zip" \
+          "$DOWNLOAD_DIR/DevOpsToolkit-Setup.zip"
+
+        echo "Downloaded from s3://$BUCKET/packages/latest/"
+        ls -lh "$DOWNLOAD_DIR/"
+      displayName: 'Download from S3 File Share'
+      env:
+        AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+        AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+        AWS_DEFAULT_REGION: $(AWS_DEFAULT_REGION)
 
     - script: |
         sudo dnf install -y python3-pip
@@ -189,7 +202,7 @@ stages:
 
         [windows_targets:vars]
         ansible_user=Administrator
-        ansible_password=[PASSWORD]!
+        ansible_password=$(WINDOWS_PASSWORD)
         ansible_connection=winrm
         ansible_winrm_transport=basic
         ansible_winrm_server_cert_validation=ignore
@@ -215,12 +228,15 @@ stages:
 
     - script: |
         ANSIBLE_CONFIG=ansible/ansible.cfg \
+        ANSIBLE_ROLES_PATH=ansible/roles \
         ansible-playbook \
           -i /tmp/windows-inventory.ini \
           ansible/playbooks/deploy-installer.yml \
           -e "package_path=$(System.ArtifactsDirectory)/installer-package/DevOpsToolkit-Setup.zip" \
           -vv
       displayName: 'Deploy & Install via Ansible'
+      env:
+        WINDOWS_PASSWORD: $(WINDOWS_PASSWORD)
 
 
 # STAGE 4: Cleanup (Optional — runs always)
