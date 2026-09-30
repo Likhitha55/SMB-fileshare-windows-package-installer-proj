@@ -9,6 +9,10 @@
   win_file:
     path: "{{ install_dir }}"
     state: directory
+  retries: 3
+  delay: 10
+  register: dir_result
+  until: dir_result is success
   # win_file = Windows version of Ansible's 'file' module
   # Creates C:\DevOpsToolkit on the Windows VM
 
