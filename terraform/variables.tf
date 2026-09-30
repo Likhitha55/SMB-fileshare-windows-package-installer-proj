@@ -6,13 +6,13 @@ variable "aws_region" {
 }
 
 variable "project_name" {
-  description = "Project name for resource tagging"
+  description = "Project name"
   type        = string
-  default     = "devops-toolkit"
+  default     = "win-devops"
 }
 
 variable "instance_type" {
-  description = "EC2 instance type for Windows VM"
+  description = "EC2 instance type"
   type        = string
   default     = "t3.medium"
 }
@@ -20,18 +20,27 @@ variable "instance_type" {
 variable "key_name" {
   description = "SSH key pair name"
   type        = string
-  default     = "devops-key"
+  default     = "my-key-pair"
+}
+
+variable "subnet_id" {
+  description = "Subnet ID"
+  type        = string
+}
+
+variable "vpc_id" {
+  description = "VPC ID"
+  type        = string
 }
 
 variable "windows_password" {
   description = "Windows Administrator password"
   type        = string
   sensitive   = true
-  default     = $(WINDOWS_PASSWORD)
 }
 
 variable "allowed_cidrs" {
-  description = "Allowed CIDR blocks for RDP and WinRM"
+  description = "Allowed CIDR blocks"
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
