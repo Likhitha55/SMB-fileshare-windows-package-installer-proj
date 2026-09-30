@@ -70,6 +70,19 @@ stages:
     # ***************************************************************************
     # ===========================================================================
 
+    - script: |
+        echo "=== Debug: Finding zip file ==="
+        find $(Build.SourcesDirectory) -name "*.zip" -type f
+        ls -lh scripts/DevOpsToolkit-Setup.zip 2>/dev/null || echo "NOT FOUND at scripts/"
+        ls -lh $(Build.ArtifactStagingDirectory)/*.zip 2>/dev/null || echo "NOT FOUND at staging dir"
+      displayName: 'Debug finding zip file'
+
+    - script: |
+        echo "=== Debug: AWS Identity ==="
+        aws sts get-caller-identity
+        aws s3 ls s3://devops-toolkit-packages/ 2>&1 || echo "S3 access failed"
+      displayName: 'Debug AWS Identity'
+
     # Upload to S3 File Share ──
     - script: |
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
@@ -193,6 +206,16 @@ stages:
         # Download latest package from S3
         aws s3 cp "s3://$BUCKET/packages/latest/DevOpsToolkit-Setup.zip" \
           "$DOWNLOAD_DIR/DevOpsToolkit-Setup.zip"
+
+        # Verify download
+        if [ ! -f "$DOWNLOAD_DIR/DevOpsToolkit-Setup.zip" ]; then
+          echo "Download failed! Listing S3 bucket:"
+          aws s3 ls "s3://$BUCKET/packages/" --recursive --human-readable
+          exit 1
+        fi
+
+        echo "Downloaded successfully"
+        ls -lh "$DOWNLOAD_DIR/"
 
         echo "Downloaded from s3://$BUCKET/packages/latest/"
         ls -lh "$DOWNLOAD_DIR/"
