@@ -45,7 +45,7 @@
 - name: Install Notepad++
   win_package:
     # path: "{{ install_dir }}\\{{ package_name }}\\components\\npp-installer.exe"
-    path: "{{ components_dir }}\\npp-installer.exe"
+    path: "{{ install_dir }}\\components\\npp-installer.exe"
     arguments: /S
     state: present
   timeout: 300
@@ -56,7 +56,7 @@
 - name: Install Git
   win_package:
     # path: "{{ install_dir }}\\{{ package_name }}\\components\\git-installer.exe"
-    path: "{{ components_dir }}\\git-installer.exe"
+    path: "{{ install_dir }}\\components\\git-installer.exe"
     arguments: /VERYSILENT /NORESTART
     state: present
   timeout: 300
@@ -67,7 +67,7 @@
 - name: Install Python
   win_package:
     # path: "{{ install_dir }}\\{{ package_name }}\\components\\python-installer.exe"
-    path: "{{ components_dir }}\\python-installer.exe"
+    path: "{{ install_dir }}\\components\\python-installer.exe"
     arguments: /quiet InstallAllUsers=1 PrependPath=1
     state: present
   timeout: 300
@@ -79,7 +79,7 @@
 - name: Install AWS CLI
   win_package:
     # path: "{{ install_dir }}\\{{ package_name }}\\components\\awscli-installer.msi"
-    path: "{{ components_dir }}\\awscli-installer.msi"
+    path: "{{ install_dir }}\\components\\awscli-installer.msi"
     arguments: /quiet /norestart
     state: present
   timeout: 300
