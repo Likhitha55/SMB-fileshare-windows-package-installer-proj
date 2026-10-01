@@ -64,9 +64,9 @@ Write-Host "Creating zip package..."
 
 if ($IsLinux) {
     # Use zip command on Linux
-    Push-Location "./build/staging"
-    & zip -r "../../$zipPath" "DevOpsToolkit/"
-    Pop-Location
+    Push-Location "./build/staging/DevOpsToolkit"
+    & zip -r "../../../$zipPath".
+    Pop-Location  
 } else {
     Compress-Archive -Path "$StagingDir\*" -DestinationPath "$OutputPath"
 }

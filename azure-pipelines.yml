@@ -301,7 +301,7 @@ stages:
           -i /tmp/windows-inventory.ini \
           ansible/playbooks/deploy-installer.yml \
           -e "package_path=$(System.ArtifactsDirectory)/installer-package/DevOpsToolkit-Setup.zip" \
-          -e "install_dir='C:\\DevOpsToolkit\\DevOpsToolkit\\DevOpsToolkit'"
+          -e "install_dir='C:\\DevOpsToolkit'"
       displayName: 'Deploy & Install via Ansible'
       env:
         WINDOWS_PASSWORD: $(WINDOWS_PASSWORD)
