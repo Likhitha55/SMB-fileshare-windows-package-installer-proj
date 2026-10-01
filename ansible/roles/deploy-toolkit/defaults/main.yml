@@ -1,8 +1,9 @@
 #SPDX-License-Identifier: MIT-0
 ---
 # defaults file for deploy-toolkit
-install_dir: "C:\\DevOpsToolkit\\DevOpsToolkit"
+install_dir: "C:\\DevOpsToolkit"
+components_dir: "{{ install_dir }}\\components"
 package_name: devops-toolkit-package
 package_source: "{{ playbook_dir }}/../../package/devops-toolkit-package.zip"
-components_dir: "{{ install_dir }}\\{{ package_name }}\\components"
+# components_dir: "{{ install_dir }}\\{{ package_name }}\\components"
 s3_bucket: devops-toolkit-packages

@@ -68,7 +68,7 @@ if ($IsLinux) {
     & zip -r "../../$zipPath" "DevOpsToolkit/"
     Pop-Location
 } else {
-    Compress-Archive -Path "$stagingDir" -DestinationPath $zipPath -Force
+    Compress-Archive -Path "$StagingDir\*" -DestinationPath "$OutputPath"
 }
 
 # Generate checksum
